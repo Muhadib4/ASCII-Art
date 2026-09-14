@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function NotFound() { return <main id="main" className="error-page"><div className="eyebrow">[ SIGNAL LOST ]</div><pre aria-hidden="true">{'┌───────────────┐\n│  4  0  4  _   │\n└───────────────┘'}</pre><h1>A character out of place.</h1><p>This page could not be found. Your next idea is still waiting.</p><Link className="button primary" href="/">Back to the studio ↗</Link></main>; }
