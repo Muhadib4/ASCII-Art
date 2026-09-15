@@ -1,14 +1,16 @@
 import type { AsciiResult, AsciiSettings, PixelSource } from "./types";
 
-const clamp = (value: number, min = 0, max = 255) => Math.max(min, Math.min(max, value));
+const clamp = (value: number, min = 0, max = 255) => Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : min;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 /** Pure, DOM-free conversion. Both the worker and synchronous fallback use this implementation. */
 export function processImage(source: PixelSource, settings: AsciiSettings): AsciiResult {
-  if (!source.width || !source.height || source.data.length !== source.width * source.height * 4) {
+  if (!Number.isSafeInteger(source.width) || !Number.isSafeInteger(source.height) || source.width <= 0 || source.height <= 0 || source.data.length !== source.width * source.height * 4) {
     throw new Error("This image could not be read. Please try a different file.");
   }
-  const ramp = Array.from(settings.ramp || "@%#*+=-:. ");
+  // Control characters cannot occupy a cell; ordinary spaces at either end are meaningful.
+  const rampText = typeof settings.ramp === "string" ? settings.ramp.replace(/[\u0000-\u001f\u007f-\u009f]/g, "") : "";
+  const ramp = Array.from(rampText || "@%#*+=-:. ");
   const cols = Math.round(clamp(settings.width, 8, 320));
   const rows = Math.round(clamp((source.height / source.width) * cols * clamp(settings.aspectRatio, 0.15, 2), 1, 500));
   const count = cols * rows;
@@ -20,6 +22,8 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
   const exposure = 2 ** clamp(settings.exposure, -5, 5);
   const gamma = 1 / clamp(settings.gamma, 0.1, 5);
   const saturation = clamp(settings.saturation, 0, 200) / 100;
+  const brightness = clamp(settings.brightness, -100, 100) * 2.55;
+  const preserveAlpha = settings.transparency === "preserve";
 
   for (let y = 0; y < rows; y++) {
     const y0 = Math.floor(y * source.height / rows);
@@ -32,7 +36,7 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
         for (let sx = x0; sx < Math.min(x1, source.width); sx++) {
           const offset = (sy * source.width + sx) * 4;
           const a = source.data[offset + 3] / 255;
-          const bg = settings.transparency === "black" ? 0 : 255;
+          const bg = preserveAlpha || settings.transparency === "black" ? 0 : 255;
           red += source.data[offset] * a + bg * (1 - a);
           green += source.data[offset + 1] * a + bg * (1 - a);
           blue += source.data[offset + 2] * a + bg * (1 - a);
@@ -40,8 +44,11 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
           samples++;
         }
       }
+      // Average premultiplied color, then unpremultiply once. Compositing against white
+      // here and applying alpha again in the renderer would wash out translucent edges.
+      const colorWeight = preserveAlpha ? Math.max(opacity / 255, Number.EPSILON) : samples;
       const transform = (value: number) => {
-        const exposed = clamp((value / samples) * exposure + settings.brightness * 2.55);
+        const exposed = clamp((value / colorWeight) * exposure + brightness);
         const contrasted = clamp(contrastFactor * (exposed - 128) + 128);
         return 255 * (contrasted / 255) ** gamma;
       };
@@ -56,7 +63,7 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
       colors[index * 3 + 1] = settings.invert ? 255 - green : green;
       colors[index * 3 + 2] = settings.invert ? 255 - blue : blue;
       light[index] = settings.invert ? 255 - gray : gray;
-      alpha[index] = settings.transparency === "preserve" ? opacity / samples : 255;
+      alpha[index] = preserveAlpha ? opacity / samples : 255;
     }
   }
 
@@ -92,7 +99,7 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
       let value = clamp(light[index]);
       if (settings.dither === "bayer") value = clamp(value + ((BAYER[(y % 4) * 4 + x % 4] + 0.5) / 16 - 0.5) * (255 / levels));
       const level = settings.dither === "threshold"
-        ? (value >= settings.threshold ? ramp.length - 1 : 0)
+        ? (value >= clamp(settings.threshold) ? ramp.length - 1 : 0)
         : Math.round(value / 255 * (ramp.length - 1));
       chars[index] = ramp[level];
       const error = value - (level / levels) * 255;
