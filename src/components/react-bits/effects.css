@@ -1,0 +1,14 @@
+.rb-pixel-environment { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; contain: layout style paint; pointer-events: none; }
+.rb-pixel-environment canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+.pixel-card { position: relative; isolation: isolate; overflow: hidden; }
+.rb-pixel-card-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .42; z-index: 0; pointer-events: none; }
+.pixel-card > :not(canvas) { position: relative; z-index: 1; }
+.rb-trail-container { position: absolute; inset: 0; pointer-events: none; }
+.rb-trail-container > div, .rb-trail-container canvas { pointer-events: none !important; }
+.rb-goo-filter { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.studio-effects { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.studio-effects-environment { position: absolute; inset: 0; opacity: .2; }
+.studio-effects-trail { position: absolute; inset: 0; opacity: .16; }
+.studio-effects-fallback { position: absolute; inset: 0; opacity: .1; background-image: radial-gradient(var(--accent) .7px, transparent .7px); background-size: 12px 12px; mask-image: linear-gradient(transparent, #000 45%, transparent); }
+.studio-crt { position: absolute; inset: 0; opacity: .16; background: repeating-linear-gradient(transparent 0 3px, var(--accent) 3px 4px); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .rb-pixel-card-canvas { display: none; } }

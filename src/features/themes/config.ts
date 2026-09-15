@@ -96,6 +96,22 @@ export const themes: ThemeConfig[] = [
 
 export const themeById = Object.fromEntries(themes.map(theme => [theme.id, theme])) as Record<ThemeId, ThemeConfig>;
 
+/** Background choice and tuning live beside the visual/audio tokens. */
+export const themeEffects = {
+  mono: { environment: null, crt: false },
+  terminal: { environment: null, crt: true },
+  neon: { environment: 'blast', crt: false, blast: {
+    variant: 'circle', pixelSize: 5, patternScale: 2.6, patternDensity: 1.05,
+    pixelSizeJitter: .35, enableRipples: true, rippleSpeed: .35, rippleThickness: .09,
+    rippleIntensityScale: 1.2, liquid: true, liquidStrength: .055, liquidRadius: .8,
+    liquidWobbleSpeed: 3.5, speed: .35, edgeFade: .24, transparent: true,
+  } },
+  winter: { environment: 'snow', crt: false, snow: {
+    flakeSize: .012, minFlakeSize: 1.15, pixelResolution: 210, speed: .55,
+    density: .17, direction: 125, brightness: .9, farPlane: 12, depthFade: 6,
+  } },
+} as const;
+
 export function themeVariables(theme: ThemeConfig, mode: BrightnessMode): Record<string, string> {
   const p = theme[mode];
   return {
