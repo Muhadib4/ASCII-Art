@@ -39,8 +39,11 @@ export default function CanvasPreview({ result, processing, onError }: { result:
 
   useEffect(() => {
     if (!canvasRef.current || !result) return;
-    try { renderArtwork(canvasRef.current, result, doc.style, doc.layers); }
+    let cancelled = false;
+    const render = () => { if (!cancelled && canvasRef.current) renderArtwork(canvasRef.current, result, doc.style, doc.layers); };
+    try { render(); void document.fonts?.ready.then(() => { try { render(); } catch { /* The next artwork update retries. */ } }); }
     catch (reason) { onError(reason instanceof Error ? reason.message : "The preview could not render. Try a smaller resolution."); }
+    return () => { cancelled = true; };
   }, [result, doc.style, doc.layers, onError]);
 
   const resetView = () => setView({ zoom: 1, x: 0, y: 0 });

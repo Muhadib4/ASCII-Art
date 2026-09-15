@@ -51,11 +51,12 @@ export function useAsciiProcessor(source: PixelSource | null, settings: AsciiSet
         fallback();
       };
     } catch { workerRef.current = null; }
-    return () => { worker?.terminate(); workerRef.current = null; busy.current = false; pending.current = null; generation.current++; };
+    return () => { worker?.terminate(); workerRef.current = null; busy.current = false; pending.current = null; };
   }, []);
 
   useEffect(() => {
     const id = ++generation.current;
+    setState(previous => ({ ...previous, processing: Boolean(source || textInput), error: null }));
     const timer = setTimeout(() => {
       if (textInput !== null) {
         pending.current = null;

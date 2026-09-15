@@ -9,6 +9,9 @@ export interface ArtworkScene extends ArtworkDimensions { glyphs: ArtworkGlyph[]
 const bounded = (value: number, low: number, high: number) => Number.isFinite(value) ? Math.max(low, Math.min(high, value)) : low;
 
 export function getArtworkDimensions(result: AsciiResult, style: ArtworkStyle): ArtworkDimensions {
+  if (!Number.isSafeInteger(result.cols) || !Number.isSafeInteger(result.rows) || result.cols < 1 || result.rows < 1 || result.cols * result.rows > 500_000 || result.chars.length !== result.cols * result.rows) {
+    throw new Error("This artwork has invalid dimensions. Generate the artwork again.");
+  }
   const fontSize = bounded(style.fontSize, 4, 96);
   const cellWidth = Math.max(1, fontSize * 0.6 + bounded(style.letterSpacing, -3, 20));
   const cellHeight = fontSize * bounded(style.lineHeight, 0.6, 3);
@@ -39,14 +42,17 @@ export function buildArtworkScene(result: AsciiResult, style: ArtworkStyle, laye
   const dark = rgb(style.duotoneDark), light = rgb(style.duotoneLight);
   const size = bounded(style.fontSize, 4, 96);
   const opacity = bounded(style.opacity, 0, 1);
+  // Align the complete grid as one shape. Aligning each bitmap row separately
+  // changes the geometry of letters such as A, J, and every slanted banner.
+  let offset = 0;
+  if (!result.colors) {
+    let first = result.cols, last = -1;
+    result.chars.forEach((char, index) => {
+      if (char !== " " && char !== "\t") { first = Math.min(first, index % result.cols); last = Math.max(last, index % result.cols); }
+    });
+    if (last >= 0) offset = (style.alignment === "right" ? result.cols - (last - first + 1) : style.alignment === "center" ? Math.floor((result.cols - (last - first + 1)) / 2) : 0) - first;
+  }
   for (let row = 0; row < result.rows; row++) {
-    let offset = 0;
-    if (!result.colors && style.alignment !== "left") {
-      const content = result.chars.slice(row * result.cols, (row + 1) * result.cols);
-      const first = content.findIndex(char => char !== " ");
-      const last = content.findLastIndex(char => char !== " ");
-      if (first >= 0) offset = (style.alignment === "right" ? result.cols - (last - first + 1) : Math.floor((result.cols - (last - first + 1)) / 2)) - first;
-    }
     for (let col = 0; col < result.cols; col++) {
       const index = row * result.cols + col;
       const char = result.chars[index];
@@ -108,7 +114,7 @@ export function buildArtworkScene(result: AsciiResult, style: ArtworkStyle, laye
 
 /** Raster memory is capped deliberately: callers get a useful error, never a blank oversized export. */
 export function validateRasterSize(width: number, height: number, scale: number) {
-  if (!Number.isFinite(scale) || scale <= 0 || width * scale > 16384 || height * scale > 16384 || width * height * scale * scale > 40_000_000) {
+  if (![width, height, scale].every(Number.isFinite) || width <= 0 || height <= 0 || scale <= 0 || width * scale > 16384 || height * scale > 16384 || width * height * scale * scale > 40_000_000) {
     throw new Error("This export is too large. Reduce export scale, font size, or ASCII resolution.");
   }
 }

@@ -31,6 +31,7 @@ export default function PixelBlast({ variant = 'square', pixelSize = 3, color = 
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias, alpha: true, powerPreference: 'low-power' }); }
     catch { onError?.(); return; }
+    renderer.debug.onShaderError = () => onError?.();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     renderer.setClearColor(0, transparent ? 0 : 1);
     container.appendChild(renderer.domElement);
@@ -100,7 +101,7 @@ export default function PixelBlast({ variant = 'square', pixelSize = 3, color = 
       touch?.update();
       postEffects.forEach(effect => { const uniform = effect.uniforms.get('uTime'); if (uniform) uniform.value = uniforms.uTime.value; });
       if (composer) composer.render(); else renderer.render(scene, camera);
-    });
+    }, onError);
     return () => {
       stop(); observer.disconnect();
       document.removeEventListener('pointerdown', pointerDown);

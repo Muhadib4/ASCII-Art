@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/features/themes/store';
+import { animateWhileVisible } from './react-bits/animation';
 
 type Point = { x: number; y: number; z: number; nx: number; ny: number; nz: number };
 function makeSculpture(): Point[] {
@@ -43,7 +44,7 @@ export default function AsciiSculpture({ density = 1, comparison = 0, paused = f
     const ramp = ' .,:;+=xX#%@';
     const themeColors = { mono: ['#deded7', '#353533'], terminal: ['#b4f7a5', '#2f6634'], neon: ['#d1b7ff', '#634b8d'], winter: ['#dbf2ff', '#4d7689'] };
     const [foreground, low] = mode === 'light' ? ['#292b29', '#b0b2ae'] : themeColors[theme];
-    let frame = 0, last = 0, visible = true, angle = 0.12;
+    let last = 0, angle = 0.12;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const draw = () => {
       depth.fill(-Infinity); light.fill(0);
@@ -78,15 +79,15 @@ export default function AsciiSculpture({ density = 1, comparison = 0, paused = f
       }
       context.globalAlpha = 1;
     };
-    const animate = (time: number) => {
-      if (time - last > 70 && visible && !document.hidden && effects && !motion.matches && !paused) { angle += 0.008; draw(); last = time; }
-      frame = requestAnimationFrame(animate);
+    let stop = () => {};
+    const sync = () => {
+      stop(); last = 0; draw();
+      if (!paused && effects && !motion.matches) stop = animateWhileVisible(canvas, time => {
+        if (time - last > .07) { angle += .008; draw(); last = time; }
+      });
     };
-    const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; });
-    observer.observe(canvas);
-    draw();
-    if (!paused && effects && !motion.matches) frame = requestAnimationFrame(animate);
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+    sync(); motion.addEventListener('change', sync);
+    return () => { stop(); motion.removeEventListener('change', sync); };
   }, [theme, mode, effects, density, comparison, paused]);
   return <canvas ref={ref} className="sculpture-canvas" aria-label="A three-dimensional trefoil sculpture rendered in ASCII characters, slowly rotating" role="img" />;
 }

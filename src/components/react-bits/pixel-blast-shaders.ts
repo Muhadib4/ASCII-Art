@@ -59,6 +59,7 @@ export const createTouchTexture = () => {
     }
     last = { x: norm.x, y: norm.y };
     trail.push({ x: norm.x, y: norm.y, age: 0, force, vx, vy });
+    if (trail.length > 96) trail.splice(0, trail.length - 96);
   };
   const update = () => {
     clear();

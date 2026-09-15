@@ -26,6 +26,7 @@ export default function PixelSnow({ color = '#ffffff', flakeSize = .01, minFlake
     try {
       renderer = new WebGLRenderer({ antialias: false, alpha: true, premultipliedAlpha: false, powerPreference: 'low-power', stencil: false, depth: false });
     } catch { onError?.(); return; }
+    renderer.debug.onShaderError = () => onError?.();
     // Snow is intentionally rendered at CSS resolution: its shader performs pixelation.
     renderer.setPixelRatio(1);
     renderer.setClearColor(0, 0);
@@ -56,7 +57,7 @@ export default function PixelSnow({ color = '#ffffff', flakeSize = .01, minFlake
     const stop = animateWhileVisible(container, seconds => {
       material.uniforms.uTime.value = seconds;
       renderer.render(scene, camera);
-    });
+    }, onError);
     return () => {
       stop(); observer.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);

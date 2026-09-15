@@ -1,5 +1,5 @@
 /** Run only while visible, preserving elapsed time across pauses. */
-export function animateWhileVisible(element: HTMLElement, draw: (seconds: number) => void) {
+export function animateWhileVisible(element: HTMLElement, draw: (seconds: number) => void, onError?: () => void) {
   let frame = 0;
   let inView = true;
   let elapsed = 0;
@@ -10,7 +10,8 @@ export function animateWhileVisible(element: HTMLElement, draw: (seconds: number
     if (disposed || document.hidden || !inView) return;
     if (previous) elapsed += Math.min((now - previous) / 1000, .1);
     previous = now;
-    draw(elapsed);
+    try { draw(elapsed); }
+    catch { disposed = true; onError?.(); return; }
     frame = requestAnimationFrame(tick);
   };
   const sync = () => {

@@ -13,6 +13,8 @@ class AudioManager {
   private theme: ThemeId = 'mono';
   private settings: AudioPreferences = { master: .5, bgm: .22, sfx: .55, muted: true };
   private ambience: Ambience | null = null;
+  private ambienceTheme: ThemeId | null = null;
+  private revision = 0;
   private unlocked = false;
   private lastPlayed = new Map<AudioEvent, number>();
   private retireTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -20,6 +22,7 @@ class AudioManager {
 
   async unlock(): Promise<void> {
     if (typeof window === 'undefined') return;
+    const revision = this.revision;
     try {
       if (!this.context) {
         this.context = new AudioContext();
@@ -32,20 +35,20 @@ class AudioManager {
         this.masterNode.connect(this.context.destination);
       }
       if (this.context.state === 'suspended') await this.context.resume();
+      if (revision !== this.revision || !this.context) return;
       this.unlocked = true;
       this.applyVolumes();
-      if (!this.settings.muted && !this.ambience) this.startAmbience();
+      if (!this.settings.muted && (!this.ambience || this.ambienceTheme !== this.theme)) this.startAmbience();
     } catch {
       // Browsers without audio support still have the full creative workflow.
     }
   }
 
   configure(settings: AudioPreferences, theme: ThemeId = this.theme) {
-    const changed = this.theme !== theme;
     this.settings = settings;
     this.theme = theme;
     this.applyVolumes();
-    if (this.context && this.unlocked && !settings.muted && (changed || !this.ambience)) this.startAmbience();
+    if (this.context && this.unlocked && !settings.muted && (this.ambienceTheme !== theme || !this.ambience)) this.startAmbience();
   }
 
   setTheme(theme: ThemeId) { this.configure(this.settings, theme); }
@@ -97,6 +100,7 @@ class AudioManager {
     nodes.push(lfo, modulation);
     gain.gain.setTargetAtTime(1, context.currentTime, .6);
     this.ambience = { gain, nodes, oscillators };
+    this.ambienceTheme = this.theme;
     if (old) {
       old.gain.gain.setTargetAtTime(0, context.currentTime, .45);
       this.retiredAmbience.add(old);
@@ -152,12 +156,14 @@ class AudioManager {
   }
 
   dispose() {
+    this.revision++;
     this.retireTimers.forEach(clearTimeout);
     this.retireTimers.clear();
     this.retiredAmbience.forEach(pad => this.disposeAmbience(pad));
     this.retiredAmbience.clear();
     if (this.ambience) this.disposeAmbience(this.ambience);
     this.ambience = null;
+    this.ambienceTheme = null;
     if (this.context) void this.context.close().catch(() => {});
     this.context = null;
     this.masterNode = this.musicNode = this.sfxNode = null;

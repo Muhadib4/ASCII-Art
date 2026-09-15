@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/immutability -- Three.js materials and useTrailTexture are imperative GPU resources, updated outside React render. */
+
 import { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { shaderMaterial, useTrailTexture } from '@react-three/drei';

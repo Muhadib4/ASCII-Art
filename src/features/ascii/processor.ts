@@ -70,8 +70,8 @@ export function processImage(source: PixelSource, settings: AsciiSettings): Asci
   if (settings.sharpen > 0 || settings.edgeEnhance > 0) {
     const original = light.slice();
     const sample = (x: number, y: number) => original[clamp(y, 0, rows - 1) * cols + clamp(x, 0, cols - 1)];
-    const sharpening = clamp(settings.sharpen, 0, 100) / 40;
-    const emphasis = clamp(settings.edgeEnhance, 0, 100) / 100;
+    const sharpening = clamp(settings.sharpen, 0, 2) * 1.5;
+    const emphasis = clamp(settings.edgeEnhance, 0, 2) / 2;
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const index = y * cols + x;

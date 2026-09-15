@@ -54,7 +54,8 @@ export const TEXT_FONTS = [
 ] as const;
 
 export function generateTextArt(input: string, settings: TextSettings): AsciiResult {
-  const text = (settings.case === "upper" ? input.toUpperCase() : settings.case === "lower" ? input.toLowerCase() : input).slice(0, 1000);
+  const normalized = input.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, "");
+  const text = (settings.case === "upper" ? normalized.toUpperCase() : settings.case === "lower" ? normalized.toLowerCase() : normalized).slice(0, 1000);
   const width = Math.max(12, Math.min(320, Math.round(settings.width)));
   const scale = Math.max(1, Math.min(3, Math.round(settings.scale)));
   const spacing = Math.max(0, Math.min(8, Math.round(settings.letterSpacing)));
@@ -69,7 +70,8 @@ export function generateTextArt(input: string, settings: TextSettings): AsciiRes
     }
     if (lineGap) lines = lines.slice(0, -lineGap);
   } else {
-    const ink = settings.font === "dots" ? (settings.density === "█" ? "●" : Array.from(settings.density)[0] || "●") : Array.from(settings.density)[0] || "█";
+    const density = settings.density.replace(/[\s\u0000-\u001f\u007f-\u009f]/g, "");
+    const ink = settings.font === "dots" ? (density === "█" ? "●" : Array.from(density)[0] || "●") : Array.from(density)[0] || "█";
     const maxLogical = Math.max(7, Math.floor(width / scale) - (settings.font === "slant" ? 3 : 0));
     for (const paragraph of text.split("\n")) {
       const groups: string[][] = [[]];
@@ -83,6 +85,7 @@ export function generateTextArt(input: string, settings: TextSettings): AsciiRes
       }
       for (const group of groups) {
         const glyphs = group.map(glyph => glyph.split("/"));
+        const groupLines: string[] = [];
         for (let y = 0; y < 7; y++) {
           const row = glyphs.map(glyph => Array.from(glyph[y]).map((pixel, x) => {
             if (pixel !== "1") return " ";
@@ -91,8 +94,10 @@ export function generateTextArt(input: string, settings: TextSettings): AsciiRes
           }).join("")).join(" ".repeat(spacing));
           const slanted = (settings.font === "slant" ? " ".repeat(Math.floor((6 - y) / 2)) : "") + row;
           const scaled = Array.from(slanted).map(char => char.repeat(scale)).join("");
-          lines.push(...Array<string>(scale).fill(scaled));
+          groupLines.push(...Array<string>(scale).fill(scaled));
         }
+        const groupCols = Math.max(0, ...groupLines.map(line => Array.from(line).length));
+        lines.push(...groupLines.map(line => line + " ".repeat(groupCols - Array.from(line).length)));
         lines.push(...Array<string>(lineGap).fill(""));
       }
     }

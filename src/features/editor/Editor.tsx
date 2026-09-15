@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Camera, Check, ChevronDown, Copy, Download, Image, Keyboard, Layers, LayoutTemplate, Palette, Redo2, SlidersHorizontal, Trash2, Type, Undo2, Upload, X } from "lucide-react";
 import SiteHeader from "@/components/site-header";
 import Dialog from "@/components/dialog";
+import { EffectManager } from "@/components/effects/EffectManager";
 import { createSampleImage, loadImageFile, useAsciiProcessor } from "@/features/ascii";
 import { audioManager } from "@/features/audio/AudioManager";
 import { copyASCII } from "@/features/export";
@@ -65,6 +66,7 @@ export default function Editor() {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<{ message: string; error: boolean } | null>(null);
+  const cancelPendingUpload = useCallback(() => { uploadGeneration.current++; }, []);
   const { result, processing, error } = useAsciiProcessor(doc.mode === "text" ? null : doc.source, doc.ascii, doc.mode === "text" && doc.text.trim() ? doc.text : doc.mode === "text" ? "" : null, doc.textSettings);
   const artwork = doc.mode === "text" && !doc.text.trim() ? null : result;
   const currentMode = modes.find((item) => item.id === doc.mode) ?? modes[1];
@@ -128,13 +130,14 @@ export default function Editor() {
   }
 
   const clear = useCallback(() => {
-    uploadGeneration.current++;
+    cancelPendingUpload();
+    setUploading(false);
     edit({ source: null, sourceName: "", text: "", layers: [] });
     useEditorStore.getState().selectLayer(null);
     notify("Canvas cleared. Undo brings it back.");
-  }, [edit, notify]);
+  }, [edit, notify, cancelPendingUpload]);
 
-  async function upload(file: File) {
+  const upload = useCallback(async (file: File) => {
     const generation = ++uploadGeneration.current;
     setUploading(true);
     try {
@@ -147,7 +150,17 @@ export default function Editor() {
     } catch (reason) {
       if (generation === uploadGeneration.current) reportError(reason instanceof Error ? reason.message : "This image could not be opened.");
     } finally { if (generation === uploadGeneration.current) setUploading(false); }
-  }
+  }, [notify, reportError, setTab]);
+
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      if (event.target instanceof Element && event.target.closest("input,textarea,[contenteditable=true],dialog")) return;
+      const image = Array.from(event.clipboardData?.items ?? []).find(item => item.type.startsWith("image/"))?.getAsFile();
+      if (image) { event.preventDefault(); void upload(image); }
+    };
+    window.addEventListener("paste", paste);
+    return () => { window.removeEventListener("paste", paste); cancelPendingUpload(); };
+  }, [upload, cancelPendingUpload]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -187,6 +200,7 @@ export default function Editor() {
         <div className="studio-document-actions"><div className="studio-history"><button className="studio-icon-button" aria-label="Undo" title="Undo (Ctrl / ⌘ Z)" disabled={!past.length} onClick={undo}><Undo2 size={16} /></button><button className="studio-icon-button" aria-label="Redo" title="Redo (Ctrl / ⌘ Shift Z)" disabled={!future.length} onClick={redo}><Redo2 size={16} /></button></div><button className="studio-button studio-copy-action" disabled={!artwork || processing} onClick={() => void copy()}><Copy size={14} />Copy ASCII</button><button className="studio-button primary" disabled={!artwork || processing || uploading} onClick={() => setExportOpen(true)}><Download size={15} /><span>Export</span><span className="studio-export-arrow">↗</span></button></div>
       </div>
       <div className="studio-workspace">
+        <div className="studio-atmosphere"><EffectManager page="editor" /></div>
         <nav className="studio-mode-rail" aria-label="Creation mode"><span className="studio-rail-caption">CREATE</span>{modes.map((item) => <button key={item.id} title={item.title} onClick={() => changeMode(item.id)} aria-pressed={doc.mode === item.id}><span className="studio-mode-number">/{item.number}</span><item.icon size={21} strokeWidth={1.5} /><span>{item.label}</span></button>)}<div className="studio-rail-spacer" /><button className="studio-help-action" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><Keyboard size={19} /><span>Keys</span></button><span className="studio-rail-bottom" aria-hidden="true">+<br />+<br />+</span></nav>
         <section className="studio-canvas-column" aria-label="Artwork workspace"><div className="studio-workspace-heading"><div><span className="studio-lab-number">/{currentMode.number}</span><h1>{currentMode.title}</h1><span className="studio-lab-description">{doc.mode === "text" ? "Give your words a little character." : doc.mode === "design" ? "Compose something worth keeping." : doc.mode === "photo" ? "A new way to see yourself." : "An image. A thousand characters."}</span></div><div className="studio-workspace-utilities">{selectedLayer && <button className="studio-icon-button" title="Duplicate selected layer" aria-label="Duplicate selected layer" onClick={() => duplicateLayer(selectedLayer)}><Copy size={14} /></button>}<button className="studio-icon-button" title="Upload an image" aria-label="Upload an image" onClick={openUpload}><Upload size={15} /></button><button className="studio-icon-button" title="Clear canvas (undoable)" aria-label="Clear canvas" disabled={!artwork && !doc.layers.length} onClick={clear}><Trash2 size={15} /></button></div></div>
           <div className="studio-mobile-mode"><label htmlFor="creation-mode">CREATION MODE</label><div><select id="creation-mode" value={doc.mode} onChange={(event) => changeMode(event.target.value as CreationMode)}>{modes.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select><ChevronDown size={14} /></div></div>

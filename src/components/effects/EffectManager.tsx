@@ -31,12 +31,10 @@ export function EffectManager({ page = 'home' }: { page?: 'home' | 'editor' }) {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const fine = matchMedia('(hover: hover) and (pointer: fine)');
     let webgl = false;
-    const sync = () => setCapabilities({ ready: true, reduced: reduced.matches, finePointer: fine.matches,
-      lowPower: (navigator.hardwareConcurrency || 8) <= 4 || ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4,
-      webgl,
-    });
-    const timer = window.setTimeout(() => {
-      if (!reduced.matches) {
+    let probed = false;
+    const sync = () => {
+      if (!reduced.matches && !probed) {
+        probed = true;
         const probe = document.createElement('canvas');
         try {
           const context = probe.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
@@ -44,8 +42,12 @@ export function EffectManager({ page = 'home' }: { page?: 'home' | 'editor' }) {
           context?.getExtension('WEBGL_lose_context')?.loseContext();
         } catch { webgl = false; }
       }
-      sync();
-    }, 200);
+      setCapabilities({ ready: true, reduced: reduced.matches, finePointer: fine.matches,
+        lowPower: (navigator.hardwareConcurrency || 8) <= 4 || ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4,
+        webgl,
+      });
+    };
+    const timer = window.setTimeout(sync, 200);
     reduced.addEventListener('change', sync); fine.addEventListener('change', sync);
     return () => { clearTimeout(timer); reduced.removeEventListener('change', sync); fine.removeEventListener('change', sync); };
   }, []);
